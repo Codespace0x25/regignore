@@ -1,0 +1,8 @@
+# This file was generated from .regignore
+# Any changes must be made from the .regignore file otherwise they will not persist
+
+# Static patterns:
+binaries/
+intermediate/
+.idea/
+./deps/*/
