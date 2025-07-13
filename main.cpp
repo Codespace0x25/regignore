@@ -1,9 +1,9 @@
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <future>
-#include <iostream>
-#include <ctime>
 #include <iomanip>
+#include <iostream>
 #include <mutex>
 #include <regex>
 #include <set>
@@ -18,7 +18,7 @@ struct RegignoreEntry {
   bool isRegex;
   std::string rawLine;
   std::regex regexPattern;
-
+  /* what dose `explicit` do here */
   explicit RegignoreEntry(const std::string &line) {
     rawLine = line;
     if (line.starts_with("r:")) {
@@ -190,11 +190,27 @@ int generateGitignore(const std::string &regignoreFile,
 
   std::mutex mtx;
   std::set<std::string> matchedFiles;
-  std::time_t t = std::time(nullptr);
+  /*
+  this is here as i trued to do it in the same line. but i woudl error as it did nto like
+
+  `std::gmtime(&std::time(nullptr))`
+  in the steaming to the filein the std::put_time(std::gmtime(&std::time(nullptr)), "%Y-%m-%d %H:%M:%S UTC")
+                                                              ^ this was the problem but when i removed it,
+							      it was being pasted by valuse and it did not
+							      like that so i had to extrat it to by its self so
+							      i can pass by refrentc and also do it with out error
+							      here was comp error
+							      
+  ```
+    regignore/main.cpp:195:52: error: lvalue required as unary ‘&’ operand
+    195 |             << std::put_time(std::gmtime(&std::time(nullptr)),
+        |                                           ~~~~~~~~~^~~~~~~~~
+  ```
+   */
+  std::time_t curintTime = std::time(nullptr); 
 
   gitignore << "# This file was generated from " << regignoreFile << " at "
-            << std::put_time(std::gmtime(&t), "%Y-%m-%d %H:%M:%S UTC")
-            << "\n";
+            << std::put_time(std::gmtime(&curintTime), "%Y-%m-%d %H:%M:%S UTC") << "\n";
   gitignore << "# Any changes must be made from the " << regignoreFile
             << " file otherwise they will not persist\n";
 
