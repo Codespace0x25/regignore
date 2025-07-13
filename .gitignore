@@ -1,8 +1,10 @@
-# This file was generated from .regignore
+# This file was generated from .regignore at 2025-07-13 02:58:52 UTC
 # Any changes must be made from the .regignore file otherwise they will not persist
 
 # Static patterns:
-binaries/
-intermediate/
-.idea/
+*.*~
 ./deps/*/
+.idea/
+binaries/
+build/
+intermediate/

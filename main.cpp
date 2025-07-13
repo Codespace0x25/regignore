@@ -1,12 +1,14 @@
-#include <iostream>
+#include <ctime>
+#include <filesystem>
 #include <fstream>
-#include <string>
-#include <vector>
+#include <future>
+#include <iomanip>
+#include <iostream>
+#include <mutex>
 #include <regex>
 #include <set>
-#include <filesystem>
-#include <future>
-#include <mutex>
+#include <string>
+#include <vector>
 
 #include <CLI/CLI.hpp>
 
@@ -16,15 +18,15 @@ struct RegignoreEntry {
   bool isRegex;
   std::string rawLine;
   std::regex regexPattern;
-
-  explicit RegignoreEntry(const std::string& line) {
+  /* what dose `explicit` do here */
+  explicit RegignoreEntry(const std::string &line) {
     rawLine = line;
     if (line.starts_with("r:")) {
       isRegex = true;
       std::string expr = line.substr(2);
       try {
         regexPattern = std::regex(expr, std::regex::ECMAScript);
-      } catch (const std::regex_error& e) {
+      } catch (const std::regex_error &e) {
         std::cerr << "Invalid regex pattern: " << expr << "\n";
         isRegex = false;
       }
@@ -34,7 +36,8 @@ struct RegignoreEntry {
   }
 };
 
-std::vector<RegignoreEntry> loadRegignoreFile(const std::string& filename, bool verbose) {
+std::vector<RegignoreEntry> loadRegignoreFile(const std::string &filename,
+                                              bool verbose) {
   std::vector<RegignoreEntry> entries;
   std::ifstream file(filename);
   std::string line;
@@ -44,20 +47,24 @@ std::vector<RegignoreEntry> loadRegignoreFile(const std::string& filename, bool 
     return entries;
   }
 
-  if (verbose) std::cout << "Loading patterns from " << filename << "...\n";
+  if (verbose)
+    std::cout << "Loading patterns from " << filename << "...\n";
 
   while (std::getline(file, line)) {
-    if (line.empty() || line[0] == '#') continue;
+    if (line.empty() || line[0] == '#')
+      continue;
     entries.emplace_back(line);
   }
 
-  if (verbose) std::cout << "Loaded " << entries.size() << " patterns.\n";
+  if (verbose)
+    std::cout << "Loaded " << entries.size() << " patterns.\n";
 
   return entries;
 }
 
-bool matchesRegex(const std::string& pathStr, const std::vector<RegignoreEntry>& entries) {
-  for (const auto& entry : entries) {
+bool matchesRegex(const std::string &pathStr,
+                  const std::vector<RegignoreEntry> &entries) {
+  for (const auto &entry : entries) {
     if (entry.isRegex && std::regex_search(pathStr, entry.regexPattern)) {
       return true;
     }
@@ -65,7 +72,7 @@ bool matchesRegex(const std::string& pathStr, const std::vector<RegignoreEntry>&
   return false;
 }
 
-std::string gitignorePatternToRegex(const std::string& pattern) {
+std::string gitignorePatternToRegex(const std::string &pattern) {
   std::string regexStr;
   regexStr.reserve(pattern.size() * 2);
 
@@ -100,11 +107,13 @@ std::string gitignorePatternToRegex(const std::string& pattern) {
   return regexStr;
 }
 
-bool isUnderStaticIgnore(const std::string& path, const std::set<std::string>& staticLines) {
+bool isUnderStaticIgnore(const std::string &path,
+                         const std::set<std::string> &staticLines) {
   fs::path fsPath(path);
 
-  for (const auto& pattern : staticLines) {
-    if (pattern.empty()) continue;
+  for (const auto &pattern : staticLines) {
+    if (pattern.empty())
+      continue;
 
     bool isDirPattern = pattern.ends_with('/');
 
@@ -120,7 +129,8 @@ bool isUnderStaticIgnore(const std::string& path, const std::set<std::string>& s
     std::regex regexPattern;
 
     if (hasSlash) {
-      regexPattern = std::regex("^" + regexPatternStr + (isDirPattern ? "(/.*)?$" : "$"));
+      regexPattern =
+          std::regex("^" + regexPatternStr + (isDirPattern ? "(/.*)?$" : "$"));
       if (std::regex_match(path, regexPattern)) {
         if (isDirPattern) {
           if (fs::is_directory(fsPath) || path.size() > trimmedPattern.size()) {
@@ -133,7 +143,7 @@ bool isUnderStaticIgnore(const std::string& path, const std::set<std::string>& s
     } else {
       std::regex baseRegex("^" + regexPatternStr + "$");
 
-      for (auto& part : fsPath) {
+      for (auto &part : fsPath) {
         std::string partStr = part.generic_string();
         if (std::regex_match(partStr, baseRegex)) {
           if (isDirPattern) {
@@ -152,10 +162,9 @@ bool isUnderStaticIgnore(const std::string& path, const std::set<std::string>& s
   return false;
 }
 
-int generateGitignore(const std::string& regignoreFile,
-  const std::string& outputFile,
-  const std::string& scanDir,
-  bool verbose) {
+int generateGitignore(const std::string &regignoreFile,
+                      const std::string &outputFile, const std::string &scanDir,
+                      bool verbose) {
   if (!fs::exists(regignoreFile)) {
     std::cerr << regignoreFile << " file not found.\n";
     return 1;
@@ -165,7 +174,7 @@ int generateGitignore(const std::string& regignoreFile,
   std::set<std::string> staticLines;
   std::vector<RegignoreEntry> regexEntries;
 
-  for (const auto& entry : entries) {
+  for (const auto &entry : entries) {
     if (entry.isRegex) {
       regexEntries.push_back(entry);
     } else {
@@ -181,60 +190,89 @@ int generateGitignore(const std::string& regignoreFile,
 
   std::mutex mtx;
   std::set<std::string> matchedFiles;
+  /*
+  this is here as i trued to do it in the same line. but i woudl error as it did nto like
 
-  gitignore << "# This file was generated from " << regignoreFile << "\n";
-  gitignore << "# Any changes must be made from the " << regignoreFile << " file otherwise they will not persist\n";
+  `std::gmtime(&std::time(nullptr))`
+  in the steaming to the filein the std::put_time(std::gmtime(&std::time(nullptr)), "%Y-%m-%d %H:%M:%S UTC")
+                                                              ^ this was the problem but when i removed it,
+							      it was being pasted by valuse and it did not
+							      like that so i had to extrat it to by its self so
+							      i can pass by refrentc and also do it with out error
+							      here was comp error
+							      
+  ```
+    regignore/main.cpp:195:52: error: lvalue required as unary ‘&’ operand
+    195 |             << std::put_time(std::gmtime(&std::time(nullptr)),
+        |                                           ~~~~~~~~~^~~~~~~~~
+  ```
+   */
+  std::time_t curintTime = std::time(nullptr); 
+
+  gitignore << "# This file was generated from " << regignoreFile << " at "
+            << std::put_time(std::gmtime(&curintTime), "%Y-%m-%d %H:%M:%S UTC") << "\n";
+  gitignore << "# Any changes must be made from the " << regignoreFile
+            << " file otherwise they will not persist\n";
 
   gitignore << "\n# Static patterns:\n";
-  for (const auto& line : staticLines) {
+  for (const auto &line : staticLines) {
     gitignore << line << '\n';
   }
 
-  if (verbose) std::cout << "Scanning directory " << scanDir << " recursively...\n";
+  if (verbose)
+    std::cout << "Scanning directory " << scanDir << " recursively...\n";
 
   std::vector<fs::path> files;
-  for (const auto& file : fs::recursive_directory_iterator(fs::path(scanDir))) {
-    if (!file.is_regular_file()) continue;
+  for (const auto &file : fs::recursive_directory_iterator(fs::path(scanDir))) {
+    if (!file.is_regular_file())
+      continue;
 
     fs::path rel = fs::relative(file.path(), fs::path(scanDir));
     std::string relStr = rel.generic_string();
 
-    if (relStr == outputFile || relStr == regignoreFile) continue;
-    if (isUnderStaticIgnore(relStr, staticLines)) continue;
+    if (relStr == outputFile || relStr == regignoreFile)
+      continue;
+    if (isUnderStaticIgnore(relStr, staticLines))
+      continue;
 
     files.push_back(rel);
   }
 
-  if (verbose) std::cout << "Found " << files.size() << " files to check against regex patterns.\n";
+  if (verbose)
+    std::cout << "Found " << files.size()
+              << " files to check against regex patterns.\n";
 
   std::vector<std::future<void>> futures;
-  for (const auto& file : files) {
-    futures.push_back(std::async(std::launch::async, [&regexEntries, &matchedFiles, &mtx, file]() {
-      std::string relStr = file.generic_string();
-      if (matchesRegex(relStr, regexEntries)) {
-        std::lock_guard<std::mutex> lock(mtx);
-        matchedFiles.insert(relStr);
-      }
-    }));
+  for (const auto &file : files) {
+    futures.push_back(std::async(std::launch::async,
+                                 [&regexEntries, &matchedFiles, &mtx, file]() {
+                                   std::string relStr = file.generic_string();
+                                   if (matchesRegex(relStr, regexEntries)) {
+                                     std::lock_guard<std::mutex> lock(mtx);
+                                     matchedFiles.insert(relStr);
+                                   }
+                                 }));
   }
 
-  for (auto& fut : futures) fut.get();
+  for (auto &fut : futures)
+    fut.get();
 
   if (!matchedFiles.empty()) {
     gitignore << "\n# Files matched by regex patterns:\n";
-    for (const auto& line : matchedFiles) {
+    for (const auto &line : matchedFiles) {
       if (!staticLines.contains(line)) {
         gitignore << line << '\n';
       }
     }
   }
 
-  if (verbose) std::cout << outputFile << " generated successfully.\n";
+  if (verbose)
+    std::cout << outputFile << " generated successfully.\n";
 
   return 0;
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv) {
   CLI::App app{"Regignore to Gitignore converter CLI tool"};
 
   std::string regignoreFile = ".regignore";
@@ -243,25 +281,29 @@ int main(int argc, char** argv) {
   bool verbose = false;
   bool init = false;
 
-  app.add_option("-i,--input", regignoreFile, "Input .regignore filename")->check(CLI::ExistingFile);
+  app.add_option("-i,--input", regignoreFile, "Input .regignore filename")
+      ->check(CLI::ExistingFile);
   app.add_option("-o,--output", outputFile, "Output .gitignore filename");
-  app.add_option("-d,--directory", scanDir, "Directory to scan (default: current directory)")->check(CLI::ExistingDirectory);
+  app.add_option("-d,--directory", scanDir,
+                 "Directory to scan (default: current directory)")
+      ->check(CLI::ExistingDirectory);
   app.add_flag("-v,--verbose", verbose, "Enable verbose output");
   app.add_flag("-I,--init", init, "Create a new regignore file");
 
   CLI11_PARSE(app, argc, argv);
-  if(init)
-  {
+  if (init) {
     fs::path targetDir = fs::absolute(scanDir);
     fs::path regignorePath = targetDir / regignoreFile;
     if (fs::exists(regignorePath)) {
-      std::cerr << "Warning: " << regignoreFile <<" already exists in " << targetDir << "\n";
+      std::cerr << "Warning: " << regignoreFile << " already exists in "
+                << targetDir << "\n";
       return 1;
     }
 
     std::ofstream regignore(regignorePath);
     if (!regignore.is_open()) {
-      std::cerr << "Failed to create " << regignoreFile <<" file in " << targetDir << "\n";
+      std::cerr << "Failed to create " << regignoreFile << " file in "
+                << targetDir << "\n";
       return 1;
     }
 
@@ -273,9 +315,7 @@ int main(int argc, char** argv) {
 
     std::cout << ".regignore initialized at: " << regignorePath << "\n";
     return 0;
-  }
-  else
-  {
+  } else {
     return generateGitignore(regignoreFile, outputFile, scanDir, verbose);
   }
 }
